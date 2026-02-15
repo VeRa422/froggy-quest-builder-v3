@@ -2,11 +2,12 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background: #1a5276; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
-        #status { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 20px; }
+        #status { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 20px; text-align: center; padding: 20px; }
         #game-container { display: none; padding: 20px; }
-        .lilypad { width: 100px; height: 60px; background: green; border-radius: 50%; display: inline-block; margin: 20px; cursor: pointer; color: black; line-height: 60px; font-weight: bold; }
+        .lilypad { width: 100px; height: 60px; background: green; border-radius: 50%; display: inline-block; margin: 20px; cursor: pointer; color: black; line-height: 60px; font-weight: bold; text-align: center; }
         .frog { font-size: 50px; position: absolute; transition: all 0.5s; top: 200px; left: 50px; }
     </style>
 </head>
@@ -18,72 +19,233 @@
         <div id="pads-container"></div>
         <div id="frog" class="frog">🐸</div>
     </div>
-
 <script>
-// 1. ЗАЩИТА (Чтобы не воровали и не видели адрес)
-if (window.self === window.top && !window.location.href.includes('localhost')) {
-    document.body.innerHTML = "<h1>Доступ ограничен. Откройте игру через Genially.</h1>";
-    throw new Error("Access denied");
+// =====================================================
+// 1. ЗАЩИТА — разрешаем iframe И Genially
+// =====================================================
+// Genially загружает контент внутри своего iframe,
+// поэтому проверяем referrer вместо window.self === window.top
+(function() {
+    var isIframe = (window.self !== window.top);
+    var isLocalhost = window.location.href.indexOf('localhost') !== -1;
+    var isFile = window.location.protocol === 'file:';
+    var ref = document.referrer || '';
+    var isGenially = ref.indexOf('genially') !== -1 || ref.indexOf('genial.ly') !== -1;
+
+    // Разрешаем: iframe, localhost, file://, referrer от Genially
+    if (!isIframe && !isLocalhost && !isFile && !isGenially) {
+        document.body.innerHTML = '<h1 style="padding:40px;text-align:center;">Доступ ограничен. Откройте игру через Genially.</h1>';
+        throw new Error('Access denied — not in iframe');
+    }
+})();
+
+// =====================================================
+// 2. ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// =====================================================
+var gameData = null;
+var currentLevelIndex = 0;
+var currentQuestionIndex = 0;
+var lives = 5;
+
+// =====================================================
+// 3. ЗАГРУЗКА ДАННЫХ С GITHUB
+// =====================================================
+function loadGame() {
+    var id = new URLSearchParams(window.location.search).get('id');
+
+    if (!id) {
+        document.getElementById('status').textContent = 'Ошибка: не указан ID игры (?id=...)';
+        return;
+    }
+
+    var url = 'https://vera422.github.io/texts/data/' + id + '.json';
+
+    console.log('[Froggy] Загрузка:', url);
+
+    fetch(url)
+        .then(function(res) {
+            if (res.status === 404) {
+                document.getElementById('status').innerHTML =
+                    'Синхронизация... (подождите 30 секунд)<br>' +
+                    '<span style="font-size:14px;opacity:0.7;">GitHub Pages обновляется</span>';
+                setTimeout(loadGame, 5000);
+                return null;
+            }
+            if (!res.ok) {
+                throw new Error('HTTP ' + res.status);
+            }
+            return res.json();
+        })
+        .then(function(data) {
+            if (!data) return; // 404 retry
+            gameData = data;
+            console.log('[Froggy] Данные загружены:', data);
+            startGame();
+        })
+        .catch(function(e) {
+            console.error('[Froggy] Ошибка загрузки:', e);
+            document.getElementById('status').innerHTML =
+                'Ошибка загрузки<br>' +
+                '<span style="font-size:14px;opacity:0.7;">' + e.message + '</span><br>' +
+                '<button onclick="loadGame()" style="margin-top:15px;padding:10px 20px;font-size:16px;cursor:pointer;">Повторить</button>';
+        });
 }
 
-let gameData = null;
-
-// 2. ЗАГРУЗКА (Ждем файл от GitHub)
-async function loadGame() {
-    const id = new URLSearchParams(window.location.search).get('id');
-    try {
-        const res = await fetch(`https://vera422.github.io/texts/data/${id}.json`);
-        if (res.status === 404) {
-            document.getElementById('status').textContent = "Синхронизация... (подождите 30 секунд)";
-            setTimeout(loadGame, 5000);
-            return;
-        }
-        gameData = await res.json();
-        start();
-    } catch (e) { document.getElementById('status').textContent = "Ошибка загрузки"; }
-}
-
-// 3. ЗАПУСК ИГРЫ
-function start() {
+// =====================================================
+// 4. ЗАПУСК ИГРЫ
+// =====================================================
+function startGame() {
     document.getElementById('status').style.display = 'none';
     document.getElementById('game-container').style.display = 'block';
-    document.getElementById('quest-title').textContent = gameData.title;
-    
-    showLevel(0);
+    document.getElementById('quest-title').textContent = gameData.title || 'Froggy Quest';
+
+    // Настройки из JSON
+    if (gameData.settings) {
+        lives = parseInt(gameData.settings.lives) || 5;
+    }
+
+    currentLevelIndex = 0;
+    currentQuestionIndex = 0;
+    showCurrentQuestion();
 }
 
-function showLevel(index) {
-    const level = gameData.levels[index];
-    document.getElementById('question-text').textContent = level.question;
-    const container = document.getElementById('pads-container');
+// =====================================================
+// 5. ПОКАЗ ВОПРОСА
+// =====================================================
+function showCurrentQuestion() {
+    // Находим вопросы текущего уровня
+    // Формат от index.html: gameData.levels = { "1": [...], "2": [...] }
+    var levelKeys = Object.keys(gameData.levels || {}).sort(function(a, b) {
+        return parseInt(a) - parseInt(b);
+    });
+
+    if (currentLevelIndex >= levelKeys.length) {
+        // Все уровни пройдены — победа!
+        showVictory();
+        return;
+    }
+
+    var levelKey = levelKeys[currentLevelIndex];
+    var questions = gameData.levels[levelKey];
+
+    if (!questions || questions.length === 0) {
+        // Пустой уровень — пропускаем
+        currentLevelIndex++;
+        currentQuestionIndex = 0;
+        showCurrentQuestion();
+        return;
+    }
+
+    if (currentQuestionIndex >= questions.length) {
+        // Уровень пройден — следующий
+        currentLevelIndex++;
+        currentQuestionIndex = 0;
+        showCurrentQuestion();
+        return;
+    }
+
+    var q = questions[currentQuestionIndex];
+
+    // Формат вопроса от index.html:
+    // { question: "She ___ a book", options: ["reads", "read", "reading"], correct: 0 }
+    var questionText = q.question || q.q || '';
+    var options = q.options || [];
+    var correctIndex = q.correct || 0;
+
+    // Название уровня
+    var levelName = 'Уровень ' + levelKey;
+    if (gameData.levelMeta && gameData.levelMeta[levelKey] && gameData.levelMeta[levelKey].name) {
+        levelName = gameData.levelMeta[levelKey].name;
+    }
+
+    document.getElementById('quest-title').textContent = levelName;
+    document.getElementById('question-text').textContent =
+        'Вопрос ' + (currentQuestionIndex + 1) + ': ' + questionText;
+
+    var container = document.getElementById('pads-container');
     container.innerHTML = '';
 
-    level.answers.forEach(ans => {
-        const pad = document.createElement('div');
+    // Перемешиваем варианты
+    var shuffled = options.map(function(opt, idx) {
+        return { text: opt, isCorrect: idx === correctIndex };
+    });
+    // Fisher-Yates shuffle
+    for (var i = shuffled.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = shuffled[i];
+        shuffled[i] = shuffled[j];
+        shuffled[j] = tmp;
+    }
+
+    shuffled.forEach(function(item) {
+        var pad = document.createElement('div');
         pad.className = 'lilypad';
-        pad.textContent = ans.text;
-        pad.onclick = () => check(ans.correct);
+        pad.textContent = item.text;
+        pad.onclick = function() { checkAnswer(item.isCorrect); };
         container.appendChild(pad);
     });
 }
 
-function check(isCorrect) {
-    if(isCorrect) {
-        new Audio('https://vera422.github.io/froggy-quest-builder-v3/2.mp3').play();
-        alert("Правильно! Ква!");
-        // Тут будет переход к следующему уровню
+// =====================================================
+// 6. ПРОВЕРКА ОТВЕТА
+// =====================================================
+function checkAnswer(isCorrect) {
+    var frog = document.getElementById('frog');
+
+    if (isCorrect) {
+        // Правильно!
+        frog.style.transform = 'scale(1.3)';
+        try { new Audio('https://raw.githubusercontent.com/vivanova288-boop/froggy-quest-builder-v3/main/2.mp3').play(); } catch(e) {}
+
+        setTimeout(function() {
+            frog.style.transform = 'scale(1)';
+            currentQuestionIndex++;
+            showCurrentQuestion();
+        }, 600);
     } else {
-        // ТВОЕ ПРАВИЛО: Шок и отскок
-        const frog = document.getElementById('frog');
-        frog.style.transform = "scale(1.2)";
-        new Audio('https://vera422.github.io/froggy-quest-builder-v3/3.mp3').play();
-        setTimeout(() => { 
-            frog.style.transform = "scale(1)";
-            alert("Ой! Током ударило! Попробуй еще раз.");
+        // Ошибка!
+        lives--;
+        frog.style.transform = 'scale(1.2) rotate(10deg)';
+        frog.style.filter = 'hue-rotate(180deg)';
+        try { new Audio('https://raw.githubusercontent.com/vivanova288-boop/froggy-quest-builder-v3/main/3.mp3').play(); } catch(e) {}
+
+        setTimeout(function() {
+            frog.style.transform = 'scale(1)';
+            frog.style.filter = '';
+
+            if (lives <= 0) {
+                showGameOver();
+            }
+            // Остаёмся на том же вопросе
         }, 500);
     }
 }
 
+// =====================================================
+// 7. ЭКРАНЫ КОНЦА
+// =====================================================
+function showVictory() {
+    var victoryText = (gameData.settings && gameData.settings.victoryText) || 'ПОБЕДА! 🎉';
+    document.getElementById('game-container').innerHTML =
+        '<div style="text-align:center;padding:40px;">' +
+        '<h1 style="font-size:3em;">' + victoryText + '</h1>' +
+        '<p style="font-size:1.5em;">Отличная работа!</p>' +
+        '<button onclick="location.reload()" style="padding:15px 30px;font-size:18px;cursor:pointer;border:none;border-radius:10px;background:#22c55e;color:white;font-weight:bold;">Ещё раз</button>' +
+        '</div>';
+}
+
+function showGameOver() {
+    var goText = (gameData.settings && gameData.settings.gameoverText) || 'ИГРА ОКОНЧЕНА 😢';
+    document.getElementById('game-container').innerHTML =
+        '<div style="text-align:center;padding:40px;">' +
+        '<h1 style="font-size:3em;">' + goText + '</h1>' +
+        '<button onclick="location.reload()" style="padding:15px 30px;font-size:18px;cursor:pointer;border:none;border-radius:10px;background:#ef4444;color:white;font-weight:bold;">Попробовать снова</button>' +
+        '</div>';
+}
+
+// =====================================================
+// 8. СТАРТ
+// =====================================================
 loadGame();
 </script>
 </body>
