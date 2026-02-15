@@ -2083,40 +2083,147 @@ setInterval(function() {
 async function publishToRender() {
     var gameTitle = document.getElementById('game-title').value || 'quest';
     var gameId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now();
-    setStatus('Генерируем игру...');
+    setStatus('Генерируем конфигурацию...');
     try {
-        var gameHTML = buildGameHTML(false);
-        var sizeKb = Math.round(new Blob([gameHTML]).size / 1024);
+        // Собираем ВСЕ настройки игры в один объект (JSON)
+        var cfg = {
+            title:         gv('game-title', 'GAME'),
+            welcomeText:   gv('welcome-text', 'Готовы?'),
+            startBtnText:  gv('start-button-text', 'СТАРТ!'),
+            retryBtnText:  gv('retry-button-text', 'Ещё раз'),
+            victoryText:   gv('victory-text', 'ПОБЕДА! 🎉'),
+            victoryMsg:    gv('victory-message', 'Отличная работа!'),
+            gameoverText:  gv('gameover-text', 'ИГРА ОКОНЧЕНА 😢'),
+            lang:          gv('game-language', 'ru'),
+            enableTimer:   gb('enable-timer', true),
+            enableCd:      gb('enable-countdown', true),
+            showWatermark: gb('enable-watermark', false),
+            lives:         parseInt(gv('lives-count', '5')),
+            timerDur:      parseInt(gv('timer-duration', '15')),
+            ansFont:       parseInt(gv('answer-font-size', '22')),
+            heroSize:      parseInt(gv('hero-size', '100')),
+            heroV:         parseInt(gv('hero-vertical', '70')),
+            colBorder:     gv('color-question-border', '#6ab04c'),
+            colGlow:       gv('color-glow', '#ffffff'),
+            colTimer:      gv('color-timer', '#eb4d4b'),
+            colText:       gv('color-text', '#ffffff'),
+            victEff:       gv('victory-effect', 'fireworks'),
+            pDir:          gv('particle-direction', 'down'),
+            gpSize:        parseInt(gv('global-particle-size', '100')),
+            gpSpeed:       parseInt(gv('global-particle-speed', '100')),
+            gpCount:       parseInt(gv('global-particle-count', '100')),
+
+            // Картинки (base64)
+            imgHero:       getAsset('hero', false),
+            imgPlatform:   getAsset('platform', false),
+            imgBg:         getAsset('bg', false),
+            imgLife:       getAsset('life', false),
+            imgVictHero:   getAsset('victory-hero', false),
+            imgCustP:      getAsset('custom-particle', false),
+
+            // Аудио (URL-ы)
+            sndStart:      getAudioUrl('start'),
+            sndJump:       getAudioUrl('jump'),
+            sndShock:      getAudioUrl('shock'),
+            sndLose:       getAudioUrl('lose'),
+            sndWin:        getAudioUrl('win'),
+            sndLevel:      getAudioUrl('level'),
+            sndCountdown:  getAudioUrl('countdown'),
+
+            // Вопросы по уровням
+            levels: {},
+            levelsMeta: {}
+        };
+
+        // Заполняем вопросы
+        Object.keys(gameData.levels).forEach(function(lvl) {
+            cfg.levels[lvl] = gameData.levels[lvl].map(function(q) {
+                return { q: q.question, options: q.options, correct: q.correct };
+            });
+        });
+
+        // Заполняем мета-данные уровней (названия + картинки)
+        Object.keys(gameData.levels).forEach(function(lvl) {
+            var meta = levelMeta[lvl] || {};
+            var la = meta.assets || {};
+            cfg.levelsMeta[lvl] = {
+                name: meta.name || '',
+                hero: la.lhero ? la.lhero.compressed : '',
+                platform: la.lplatform ? la.lplatform.compressed : '',
+                bg: la.lbg ? la.lbg.compressed : ''
+            };
+        });
+
+        var jsonStr = JSON.stringify(cfg);
+        var sizeKb = Math.round(new Blob([jsonStr]).size / 1024);
         var sizeLabel = sizeKb > 1024 ? (sizeKb / 1024).toFixed(1) + ' MB' : sizeKb + ' KB';
-        if (sizeKb > 3000) {
-            if (!confirm('Игра весит ' + sizeLabel + '! Попробовать?')) { setStatus('Отменено.'); return; }
+
+        if (sizeKb > 5000) {
+            if (!confirm('Конфигурация весит ' + sizeLabel + '! Попробовать опубликовать?')) {
+                setStatus('Отменено.');
+                return;
+            }
         }
-        setStatus('Отправляем (' + sizeLabel + ')...');
+
+        setStatus('Отправляем на сервер (' + sizeLabel + ')...');
+
+        // POST на сервер — отправляем JSON
         var response = await fetch('https://publisher-server-ws6l.onrender.com/publish', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Publish-Key': 'viez' },
-            body: JSON.stringify({ id: gameId, folder: 'data', data: gameHTML, ext: 'html' })
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Publish-Key': 'viez'
+            },
+            body: JSON.stringify({
+                id: gameId,
+                folder: 'data',
+                data: cfg
+            })
         });
+
         if (!response.ok) throw new Error('Сервер ответил с ошибкой: ' + response.status);
+
+        // Формируем iframe-код
         var gameUrl = 'https://vera422.github.io/froggy-quest-builder-v3/main.html?id=' + gameId;
         var iframeCode = '<iframe src="' + gameUrl + '" width="100%" height="600px" frameborder="0" allowfullscreen style="border:none;"></iframe>';
-        try { await navigator.clipboard.writeText(iframeCode); } catch(e) {
-            var ta = document.createElement('textarea'); ta.value = iframeCode;
-            ta.style.cssText = 'position:fixed;left:-9999px';
-            document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+
+        // Копируем в буфер
+        var copied = false;
+        try {
+            await navigator.clipboard.writeText(iframeCode);
+            copied = true;
+        } catch(e) {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = iframeCode;
+                ta.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:200px;z-index:99999;';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                copied = document.execCommand('copy');
+                document.body.removeChild(ta);
+            } catch(e2) { copied = false; }
         }
-        setStatus('Опубликовано! Вставьте Ctrl+V в Genially (' + sizeLabel + ')');
-        showToast('Готово! Ctrl+V в Genially');
+
+        if (copied) {
+            setStatus('Опубликовано! Вставьте Ctrl+V в Genially (' + sizeLabel + ')');
+            showToast('Готово! Нажмите Ctrl+V в Genially');
+        } else {
+            prompt('Скопируйте этот код (Ctrl+A, Ctrl+C):', iframeCode);
+            setStatus('Опубликовано (' + sizeLabel + '). Скопируйте код из окна.');
+        }
+
     } catch (e) {
         console.error(e);
         setStatus('Ошибка: ' + e.message);
+        showToast('Ошибка: ' + e.message);
     }
 }
 
 function showToast(message) {
     var toast = document.createElement('div');
     var isErr = message.indexOf('Ошибка') >= 0;
-    toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:' + (isErr ? '#ef4444' : '#2ecc71') + ';color:white;padding:12px 24px;border-radius:20px;z-index:9999;font-weight:bold;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.3);';
+    toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:' + (isErr ? '#ef4444' : '#2ecc71') + ';color:white;padding:12px 24px;border-radius:20px;z-index:99999;font-weight:bold;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.3);';
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(function() { toast.remove(); }, 5000);
