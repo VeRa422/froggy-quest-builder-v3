@@ -26,6 +26,11 @@
     </div>
 
 <script>
+    if (window.self === window.top && !window.location.href.includes('localhost')) {
+    // Если игру открыли напрямую по ссылке, а не внутри iframe
+    document.body.innerHTML = "<h1>Доступ ограничен</h1>";
+    throw new Error("Запуск разрешен только внутри образовательных платформ.");
+}
 // Настройки путей к твоим файлам на GitHub
 const BASE_URL = "https://vera422.github.io/froggy-quest-builder-v3/";
 const DATA_URL = "https://vera422.github.io/texts/data/";
