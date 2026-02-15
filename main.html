@@ -78,28 +78,31 @@ async function init() {
     }
 
     try {
+        // Загружаем файл напрямую из вашего репозитория texts
         const response = await fetch(`https://VeRa422.github.io/texts/data/${id}.json`);
-        const result = await response.json();
-        const config = result.data; // берем данные из папки data, как сохранили в Шаге А
-
-        // Раскладываем данные из JSON по полочкам
-        LB = config.levels;
-        LEVELS_META = config.levelMeta;
+        if (!response.ok) throw new Error("Файл не найден на сервере");
         
-        // Настройки из папки settings
-        const s = config.settings;
-        lives = s.lives;
-        timerDur = s.timer;
-        document.getElementById('start-title').textContent = config.title;
-        document.getElementById('start-desc').textContent = s.welcomeText;
-        document.getElementById('start-btn').textContent = s.startBtnText;
+        const config = await response.json();
 
-        // Показываем стартовый экран
+        // ВАЖНО: Убираем лишний уровень .data, так как сервер Render сохраняет объект напрямую
+        window.LB = config.levels;
+        window.LEVELS_META = config.levelMeta;
+        
+        const s = config.settings;
+        window.timerDur = s.timer;
+        window.lives = s.lives;
+
+        // Настраиваем стартовый экран
+        document.getElementById('start-title').textContent = config.title || "Froggy Quest";
+        document.getElementById('start-desc').textContent = s.welcomeText || "";
+        document.getElementById('start-btn').textContent = s.startBtnText || "СТАРТ";
+
         document.getElementById('start-screen').style.display = 'flex';
         createPond();
     } catch (e) {
-        console.error(e);
-        alert("Ошибка загрузки файла игры");
+        console.error("Ошибка инициализации:", e);
+        document.getElementById('start-title').textContent = "Ошибка загрузки данных";
+        alert("Не удалось загрузить вопросы. Проверьте, появился ли файл в папке texts/data/");
     }
 }
 
