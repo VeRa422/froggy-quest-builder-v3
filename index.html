@@ -2119,7 +2119,6 @@ setInterval(function() {
 }, 500);
 async function publishToRender() {
     const gameTitle = document.getElementById('game-title').value || 'quest';
-    // Создаем уникальный ID для файла
     const gameId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
     
     setStatus('🚀 Публикация...');
@@ -2155,25 +2154,30 @@ async function publishToRender() {
             const gameUrl = `https://vera422.github.io/froggy-quest-builder-v3/main.html?id=${gameId}`;
             const iframeCode = `<iframe src="${gameUrl}" width="100%" height="600px" frameborder="0" allowfullscreen></iframe>`;
             
-            // БЕЗОПАСНОЕ КОПИРОВАНИЕ БЕЗ ALERT
-            const el = document.createElement('textarea');
-            el.value = iframeCode;
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
+            // Надежное копирование через невидимый элемент
+            const tempArea = document.createElement("textarea");
+            tempArea.value = iframeCode;
+            document.body.appendChild(tempArea);
+            tempArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempArea);
 
-            // Вместо всплывающего окна меняем текст кнопки или статус
-            setStatus('✅ Опубликовано! Код уже в буфере обмена.');
+            // Меняем статус, чтобы ты видела успех без всплывающих окон
+            setStatus('✅ Опубликовано! Код в буфере обмена.');
             
-            // Можно добавить красивое временное уведомление прямо в интерфейсе
-            showToast("Игра готова! Вставляйте код в Genially (Ctrl+V)");
+            // Всплывающая подсказка внизу (сама исчезнет)
+            const toast = document.createElement('div');
+            toast.style = "position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2ecc71;color:white;padding:10px 20px;border-radius:20px;z-index:9999;";
+            toast.textContent = "Готово! Теперь просто нажми Ctrl+V в Genially";
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+
         } else {
-            throw new Error('Ошибка сервера');
+            throw new Error('Сервер ответил с ошибкой');
         }
     } catch (e) {
         console.error(e);
-        setStatus('❌ Ошибка связи');
+        setStatus('❌ Ошибка связи с сервером');
     }
 }
 
