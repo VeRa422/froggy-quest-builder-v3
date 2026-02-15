@@ -1445,8 +1445,7 @@ function loadLevelImage(slot, input) {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function(e) {
-        var isBg = (slot === 'lbg');
-        compressImage(e.target.result, isBg, function(compressed) {
+        compressImage(e.target.result, function(cocompressImage(e.target.result, (slot === 'lbg'), function(compressed) {mpressed) {
             if (!levelMeta[currentLevel]) levelMeta[currentLevel] = { name: '', assets: {} };
             levelMeta[currentLevel].assets[slot] = {
                 original: e.target.result, compressed: compressed,
@@ -2159,8 +2158,8 @@ function showToast(message) {
     document.body.appendChild(toast);
     setTimeout(function() { toast.remove(); }, 5000);
 }
-}
 
+}
 </script>
 
 </body>
