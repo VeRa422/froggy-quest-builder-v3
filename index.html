@@ -968,8 +968,7 @@ They ___ happy|were|was|are"></textarea>
 
     <!-- ДЕЙСТВИЯ -->
     <button class="btn btn-green" onclick="updatePreview()">▶ Обновить предпросмотр</button>
-    <button class="btn btn-blue" onclick="copyForGenially()">📋 Скопировать для Genially</button>
-    <button class="btn btn-purple" style="margin-bottom:8px;" onclick="downloadGame()">💾 Скачать HTML (полная версия)</button>
+   <button class="btn" onclick="publishToRender()">Опубликовать игру</button>
 	<button class="btn" style="background-color: #ff4444; color: white; border: none; margin-top: 5px;" onclick="fullReset()">🛑 ПОЛНЫЙ СБРОС ПАМЯТИ</button>
 </div>
     
@@ -2118,7 +2117,59 @@ setInterval(function() {
         p.style.backgroundPosition = "center bottom";
     }
 }, 500);
+async function publishToRender() {
+    // 1. Создаем уникальное имя для файла игры
+    const gameId = "game-" + Date.now(); 
+    setStatus('🚀 Публикация...');
 
+    // 2. Собираем ВСЕ данные, которые мы настроили в редакторе
+    const payload = {
+        id: gameId,
+        folder: "data",
+        data: {
+            title: gv('game-title'),
+            levels: gameData.levels,      // Вопросы
+            levelMeta: levelMeta,        // Фоны и герои уровней
+            assets: assets,              // Картинки
+            // Сохраняем все настройки из полей ввода
+            settings: {
+                welcomeText: gv('welcome-text'),
+                startBtnText: gv('start-button-text'),
+                retryBtnText: gv('retry-button-text'),
+                victoryText: gv('victory-text'),
+                lives: gv('lives-count'),
+                timer: gv('timer-duration'),
+                enableTimer: gb('enable-timer'),
+                lang: gv('game-language')
+            }
+        }
+    };
+
+    try {
+        // 3. Отправляем запрос на твой сервер Render
+        const response = await fetch('https://publisher-server-ws6l.onrender.com/publish', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Publish-Key': 'viez' 
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            // 4. Если сервер ответил "ОК", создаем ссылку на игру
+            const gameUrl = `https://VeRa422.github.io/froggy-quest-builder-v3/main.html?id=${gameId}`;
+            const iframeCode = `<iframe src="${gameUrl}" width="100%" height="600px" frameborder="0"></iframe>`;
+            
+            // Выводим результат в окно (alert) и копируем код для Genially
+            alert("Успешно! Ссылка скопирована. Можете вставлять в Genially.");
+            navigator.clipboard.writeText(iframeCode);
+            setStatus('✅ Опубликовано');
+        }
+    } catch (e) {
+        alert("Ошибка связи с сервером: " + e.message);
+    }
+}
 </script>
 
 </body>
