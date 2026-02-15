@@ -2118,56 +2118,61 @@ setInterval(function() {
     }
 }, 500);
 async function publishToRender() {
-    // 1. Создаем уникальное имя для файла игры
-    const gameId = "game-" + Date.now(); 
+    const gameTitle = document.getElementById('game-title').value || 'FroggyQuest';
+    const gameId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
+    
     setStatus('🚀 Публикация...');
 
-    // 2. Собираем ВСЕ данные, которые мы настроили в редакторе
+    // Собираем данные аккуратно
     const payload = {
         id: gameId,
         folder: "data",
         data: {
-            title: gv('game-title'),
-            levels: gameData.levels,      // Вопросы
-            levelMeta: levelMeta,        // Фоны и герои уровней
-            assets: assets,              // Картинки
-            // Сохраняем все настройки из полей ввода
+            title: gameTitle,
+            levels: gameData.levels,
+            levelMeta: levelMeta,
+            assets: assets, // Все картинки и звуки
             settings: {
-                welcomeText: gv('welcome-text'),
-                startBtnText: gv('start-button-text'),
-                retryBtnText: gv('retry-button-text'),
-                victoryText: gv('victory-text'),
-                lives: gv('lives-count'),
-                timer: gv('timer-duration'),
-                enableTimer: gb('enable-timer'),
-                lang: gv('game-language')
+                lives: document.getElementById('lives-count').value,
+                timer: document.getElementById('timer-duration').value,
+                welcomeText: document.getElementById('welcome-text').value,
+                startBtnText: document.getElementById('start-button-text').value,
+                lang: document.getElementById('game-language').value
             }
         }
     };
 
     try {
-        // 3. Отправляем запрос на твой сервер Render
         const response = await fetch('https://publisher-server-ws6l.onrender.com/publish', {
             method: 'POST',
-            headers: { 
+            mode: 'cors', // Добавляем принудительный CORS
+            headers: {
                 'Content-Type': 'application/json',
-                'X-Publish-Key': 'viez' 
+                'X-Publish-Key': 'viez'
             },
             body: JSON.stringify(payload)
         });
 
         if (response.ok) {
-            // 4. Если сервер ответил "ОК", создаем ссылку на игру
+            // Формируем ссылку на твой main.html
             const gameUrl = `https://VeRa422.github.io/froggy-quest-builder-v3/main.html?id=${gameId}`;
-            const iframeCode = `<iframe src="${gameUrl}" width="100%" height="600px" frameborder="0"></iframe>`;
+            const iframeCode = `<iframe src="${gameUrl}" width="100%" height="600px" frameborder="0" allowfullscreen style="border:none;display:block;"></iframe>`;
             
-            // Выводим результат в окно (alert) и копируем код для Genially
-            alert("Успешно! Ссылка скопирована. Можете вставлять в Genially.");
-            navigator.clipboard.writeText(iframeCode);
-            setStatus('✅ Опубликовано');
+            await navigator.clipboard.writeText(iframeCode);
+            alert("✅ Опубликовано!\n\nКод для Genially скопирован в буфер обмена.\nID игры: " + gameId);
+            setStatus('✅ Готово');
+        } else {
+            const errorData = await response.text();
+            throw new Error(errorData || 'Ошибка сервера');
         }
     } catch (e) {
-        alert("Ошибка связи с сервером: " + e.message);
+        console.error('Ошибка публикации:', e);
+        // Если ошибка Failed to fetch, выводим более понятный совет
+        const msg = e.message === 'Failed to fetch' 
+            ? "Сервер не ответил. Возможно, игра слишком тяжелая или сервер еще просыпается. Попробуйте нажать кнопку еще раз через 10 секунд."
+            : e.message;
+        alert("Ошибка: " + msg);
+        setStatus('❌ Ошибка');
     }
 }
 </script>
