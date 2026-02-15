@@ -160,7 +160,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0f172a;font-family:
 '#brand-logo{position:fixed;bottom:52px;right:12px;width:70px;height:auto;opacity:0.85;z-index:1500;pointer-events:none;'+(showWatermark?'':'display:none;')+'}\n'+
 '#copyright{position:fixed;bottom:0;left:0;width:100%;background:rgba(0,0,0,.55);color:rgba(255,255,255,.75);font-size:10px;text-align:center;padding:4px 8px;z-index:1500;pointer-events:none;'+(showWatermark?'':'display:none;')+'}\n'+
 '</style>\n</head>\n<body>\n\n'+
-'<div id="start-screen"><h1>'+escH(title)+'</h1><p>'+escH(welcomeText)+'</p><button id="start-btn" onclick="hideStart()">'+escH(startBtnText)+'</button></div>\n\n'+
+'<div id="start-screen"><h1>'+escH(title)+'</h1><p>'+escH(welcomeText)+'</p><button id="start-btn" id="start-btn">'+escH(startBtnText)+'</button></div>\n\n'+
 countdownHTML+'\n\n'+
 '<div id="ui"><div id="header">'+escH(title)+'</div><div id="lives-wrap"></div><div id="qbox"><div id="q-text"><b>'+escH(welcomeText)+'</b></div><div class="tbar"><div id="tfill"></div></div></div></div>\n\n'+
 '<div id="vol-ctrl"><span id="vol-icon">🔊</span><input type="range" id="vol-slider" min="0" max="1" step="0.1" value="0.5"></div>\n\n'+
@@ -183,7 +183,7 @@ countdownHTML+'\n\n'+
 'var pond=document.getElementById("pond"),frog=document.getElementById("frog");\n'+
 'var fxC=document.getElementById("fxCanvas"),ctx=fxC.getContext("2d");\n'+
 'function szC(){fxC.width=innerWidth;fxC.height=innerHeight;}window.addEventListener("resize",szC);szC();\n'+
-'function hideStart(){document.getElementById("start-screen").style.display="none";initGame();}\n'+
+'function hideStart(){document.getElementById("start-screen").style.display="none";initGame();}document.getElementById("start-btn").addEventListener("click",hideStart);document.getElementById("start-btn").addEventListener("touchend",function(e){e.preventDefault();hideStart();});\n'+
 'function createPond(){pond.querySelectorAll(".leaf").forEach(function(l){l.remove();});var R=7,C=5;var pi=LEVELS_META[currentLevel]&&LEVELS_META[currentLevel].platform||"";for(var r=0;r<R;r++)for(var c=1;c<4;c++){var l=document.createElement("div");l.className="leaf";if(pi){l.style.backgroundImage="url("+JSON.stringify(pi)+")";l.style.backgroundSize="contain";l.style.backgroundPosition="center";l.style.backgroundRepeat="no-repeat";}var cw=100/(C-1),off=(r%2===0)?0:cw/2,lp=50+((c*cw+off)-62.5)*1.2;l.style.left=lp+"%";l.style.top=((r/(R-1))*65+5)+"%";l.id="leaf-"+r+"-"+c;pond.appendChild(l);}}\n'+
 'function initGame(){pond.classList.remove("pond-transition");'+initCode+'}\n'+
 'function shuffle(a){var b=[].concat(a);for(var i=b.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var x=b[i];b[i]=b[j];b[j]=x;}return b;}\n'+
