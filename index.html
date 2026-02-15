@@ -2119,11 +2119,11 @@ setInterval(function() {
 }, 500);
 async function publishToRender() {
     const gameTitle = document.getElementById('game-title').value || 'quest';
+    // Создаем уникальный ID для файла
     const gameId = gameTitle.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
     
     setStatus('🚀 Публикация...');
 
-    // Облегчаем пакет данных: убираем тяжелые assets, если они уже есть на гитхабе
     const payload = {
         id: gameId,
         folder: "data",
@@ -2131,7 +2131,6 @@ async function publishToRender() {
             title: gameTitle,
             levels: gameData.levels,
             levelMeta: levelMeta,
-            // Передаем только настройки, без вшитых картинок (Base64)
             settings: {
                 lives: document.getElementById('lives-count').value,
                 timer: document.getElementById('timer-duration').value,
@@ -2153,21 +2152,38 @@ async function publishToRender() {
         });
 
         if (response.ok) {
-            const gameUrl = `https://VeRa422.github.io/froggy-quest-builder-v3/main.html?id=${gameId}`;
-            const iframeCode = `<iframe src="${gameUrl}" width="100%" height="600px" frameborder="0" allowfullscreen style="border:none;display:block;"></iframe>`;
+            const gameUrl = `https://vera422.github.io/froggy-quest-builder-v3/main.html?id=${gameId}`;
+            const iframeCode = `<iframe src="${gameUrl}" width="100%" height="600px" frameborder="0" allowfullscreen></iframe>`;
             
-            await navigator.clipboard.writeText(iframeCode);
-            alert("✅ Опубликовано!\n\nКод скопирован. Теперь игра весит мало и сервер её пропустил.");
-            setStatus('✅ Готово');
+            // БЕЗОПАСНОЕ КОПИРОВАНИЕ БЕЗ ALERT
+            const el = document.createElement('textarea');
+            el.value = iframeCode;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+
+            // Вместо всплывающего окна меняем текст кнопки или статус
+            setStatus('✅ Опубликовано! Код уже в буфере обмена.');
+            
+            // Можно добавить красивое временное уведомление прямо в интерфейсе
+            showToast("Игра готова! Вставляйте код в Genially (Ctrl+V)");
         } else {
-            const errorText = await response.text();
-            throw new Error(errorText || 'Ошибка сервера');
+            throw new Error('Ошибка сервера');
         }
     } catch (e) {
         console.error(e);
-        alert("Ошибка: " + e.message);
-        setStatus('❌ Ошибка');
+        setStatus('❌ Ошибка связи');
     }
+}
+
+// Маленькая функция для красивых уведомлений вместо системных окон
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.style = "position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:12px 24px; border-radius:30px; z-index:10000; font-family:sans-serif;";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
 }
 </script>
 
