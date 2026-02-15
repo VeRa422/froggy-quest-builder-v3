@@ -1,82 +1,90 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>Froggy Quest</title>
     <style>
-        body { background: #1a5276; color: white; font-family: sans-serif; text-align: center; margin: 0; overflow: hidden; }
-        #game-container { display: none; width: 100vw; height: 100vh; position: relative; }
-        #status { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 24px; }
-        .frog { transition: all 0.5s; position: absolute; z-index: 10; }
-        .shock { animation: shake 0.2s infinite; filter: contrast(2) sepia(1) hue-rotate(150deg); }
-        @keyframes shake { 0% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } 100% { transform: translate(2px, -2px); } }
+        body { background: #1a5276; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
+        #status { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 20px; }
+        #game-container { display: none; padding: 20px; }
+        .lilypad { width: 100px; height: 60px; background: green; border-radius: 50%; display: inline-block; margin: 20px; cursor: pointer; color: black; line-height: 60px; font-weight: bold; }
+        .frog { font-size: 50px; position: absolute; transition: all 0.5s; top: 200px; left: 50px; }
     </style>
 </head>
 <body>
     <div id="status">Загрузка игры...</div>
     <div id="game-container">
-        <div id="lives">❤️❤️❤️</div>
-        <div id="question-box"></div>
+        <h2 id="quest-title"></h2>
+        <div id="question-text" style="font-size: 24px; margin-bottom: 20px;"></div>
+        <div id="pads-container"></div>
         <div id="frog" class="frog">🐸</div>
     </div>
 
 <script>
-// ЗАЩИТА И СКРЫТИЕ ГИТХАБА
+// 1. ЗАЩИТА (Чтобы не воровали и не видели адрес)
 if (window.self === window.top && !window.location.href.includes('localhost')) {
-    document.body.innerHTML = "<h1>Доступ ограничен</h1>";
-    throw new Error("Direct access denied");
+    document.body.innerHTML = "<h1>Доступ ограничен. Откройте игру через Genially.</h1>";
+    throw new Error("Access denied");
 }
 
-let gameConfig = null;
+let gameData = null;
 
-async function loadData() {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    const url = `https://vera422.github.io/texts/data/${id}.json`;
-
+// 2. ЗАГРУЗКА (Ждем файл от GitHub)
+async function loadGame() {
+    const id = new URLSearchParams(window.location.search).get('id');
     try {
-        const response = await fetch(url);
-        if (response.status === 404) {
-            document.getElementById('status').textContent = "Синхронизация с сервером (30 сек)...";
-            setTimeout(loadData, 5000);
+        const res = await fetch(`https://vera422.github.io/texts/data/${id}.json`);
+        if (res.status === 404) {
+            document.getElementById('status').textContent = "Синхронизация... (подождите 30 секунд)";
+            setTimeout(loadGame, 5000);
             return;
         }
-        gameConfig = await response.json();
-        setupGame();
-    } catch (e) {
-        document.getElementById('status').textContent = "Ошибка загрузки";
+        gameData = await res.json();
+        start();
+    } catch (e) { document.getElementById('status').textContent = "Ошибка загрузки"; }
+}
+
+// 3. ЗАПУСК ИГРЫ
+function start() {
+    document.getElementById('status').style.display = 'none';
+    document.getElementById('game-container').style.display = 'block';
+    document.getElementById('quest-title').textContent = gameData.title;
+    
+    showLevel(0);
+}
+
+function showLevel(index) {
+    const level = gameData.levels[index];
+    document.getElementById('question-text').textContent = level.question;
+    const container = document.getElementById('pads-container');
+    container.innerHTML = '';
+
+    level.answers.forEach(ans => {
+        const pad = document.createElement('div');
+        pad.className = 'lilypad';
+        pad.textContent = ans.text;
+        pad.onclick = () => check(ans.correct);
+        container.appendChild(pad);
+    });
+}
+
+function check(isCorrect) {
+    if(isCorrect) {
+        new Audio('https://vera422.github.io/froggy-quest-builder-v3/2.mp3').play();
+        alert("Правильно! Ква!");
+        // Тут будет переход к следующему уровню
+    } else {
+        // ТВОЕ ПРАВИЛО: Шок и отскок
+        const frog = document.getElementById('frog');
+        frog.style.transform = "scale(1.2)";
+        new Audio('https://vera422.github.io/froggy-quest-builder-v3/3.mp3').play();
+        setTimeout(() => { 
+            frog.style.transform = "scale(1)";
+            alert("Ой! Током ударило! Попробуй еще раз.");
+        }, 500);
     }
 }
 
-function setupGame() {
-    document.getElementById('status').style.display = 'none';
-    document.getElementById('game-container').style.display = 'block';
-    console.log("Игра готова:", gameConfig.title);
-    // Здесь вызываются твои функции отрисовки уровней
-}
-
-// ПРАВИЛО: Шок лягушки при неверном ответе
-function onWrongAnswer() {
-    const frog = document.getElementById('frog');
-    frog.classList.add('shock'); // Визуальный эффект удара током
-    const audio = new Audio('https://vera422.github.io/froggy-quest-builder-v3/3.mp3');
-    audio.play();
-    
-    setTimeout(() => {
-        frog.classList.remove('shock');
-        // Лягушка отскакивает назад (согласно твоим правилам)
-        bounceBack(); 
-    }, 1000);
-}
-
-// ПРАВИЛО: Звук 4.mp3 в конце игры
-function finishGame() {
-    const winAudio = new Audio('https://vera422.github.io/froggy-quest-builder-v3/4.mp3');
-    winAudio.play();
-    alert("ПОБЕДА!");
-}
-
-loadData();
+loadGame();
 </script>
 </body>
 </html>
