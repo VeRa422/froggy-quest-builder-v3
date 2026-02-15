@@ -72,37 +72,41 @@ var LB=[], LEVELS_META={}, lives=5, timerDur=15, currentLevel=1, step=0, questio
 // --- ШАГ 2: МАГИЯ ЗАГРУЗКИ ---
 async function init() {
     const id = new URLSearchParams(window.location.search).get('id');
-    if (!id) {
-        document.getElementById('start-title').textContent = "Ошибка: ID игры не найден";
-        return;
-    }
+    if (!id) return;
+
+    // Ссылка на ваш репозиторий со звуками и картинками
+    const baseAssetsUrl = "https://VeRa422.github.io/froggy-quest-builder-v3/";
 
     try {
-        // Загружаем файл напрямую из вашего репозитория texts
         const response = await fetch(`https://VeRa422.github.io/texts/data/${id}.json`);
-        if (!response.ok) throw new Error("Файл не найден на сервере");
         
-        const config = await response.json();
+        if (response.status === 404) {
+            document.getElementById('start-title').textContent = "GitHub обновляется...";
+            setTimeout(init, 5000); // Пробуем снова через 5 секунд
+            return;
+        }
 
-        // ВАЖНО: Убираем лишний уровень .data, так как сервер Render сохраняет объект напрямую
+        const config = await response.json();
         window.LB = config.levels;
         window.LEVELS_META = config.levelMeta;
-        
         const s = config.settings;
-        window.timerDur = s.timer;
-        window.lives = s.lives;
 
-        // Настраиваем стартовый экран
-        document.getElementById('start-title').textContent = config.title || "Froggy Quest";
-        document.getElementById('start-desc').textContent = s.welcomeText || "";
-        document.getElementById('start-btn').textContent = s.startBtnText || "СТАРТ";
+        // ПРАВИМ ПУТИ К ЗВУКАМ (чтобы не было TypeError)
+        // Теперь игра будет брать звуки 1.mp3, 2.mp3 прямо с вашего GitHub
+        window.soundPaths = {
+            jump: baseAssetsUrl + "1.mp3",
+            right: baseAssetsUrl + "2.mp3",
+            wrong: baseAssetsUrl + "3.mp3",
+            win: baseAssetsUrl + "4.mp3", // Тот самый звук в конце игры
+            fail: baseAssetsUrl + "5.mp3"
+        };
 
+        document.getElementById('start-title').textContent = config.title;
         document.getElementById('start-screen').style.display = 'flex';
         createPond();
     } catch (e) {
-        console.error("Ошибка инициализации:", e);
-        document.getElementById('start-title').textContent = "Ошибка загрузки данных";
-        alert("Не удалось загрузить вопросы. Проверьте, появился ли файл в папке texts/data/");
+        console.error(e);
+        document.getElementById('start-title').textContent = "Ошибка загрузки. Обновите страницу через минуту.";
     }
 }
 
