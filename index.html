@@ -1019,7 +1019,7 @@ function sliderVal(el, valId) {
     document.getElementById(valId).textContent = el.value;
     // Если это слайдеры сжатия — пересжимаем все загруженные картинки
     if (el.id === 'img-max-size' || el.id === 'img-quality') {
-        recompressAllImages();
+        recompressElementImages();
     }
     schedulePreview();
 }
@@ -1075,44 +1075,7 @@ function recompressBgImages() {
     setTimeout(updateSizeDisplay, 200);
 }
 
-// 4. Универсальная функция сжатия (теперь понимает разницу между фоном и героем)
-function compressImage(dataUrl, isBg, callback) {
-    // Если стоит галочка "Без сжатия" для фона — отдаем оригинал
-    if (isBg && document.getElementById('bg-no-compress') && document.getElementById('bg-no-compress').checked) {
-        callback(dataUrl);
-        return;
-    }
 
-    var img = new Image();
-    img.onload = function() {
-        var maxSize, quality;
-        
-        if (isBg) {
-            maxSize = parseInt(document.getElementById('bg-max-size').value) || 1200;
-            quality = (parseInt(document.getElementById('bg-quality').value) || 88) / 100;
-        } else {
-            maxSize = parseInt(document.getElementById('img-max-size').value) || 300;
-            quality = (parseInt(document.getElementById('img-quality').value) || 70) / 100;
-        }
-
-        var canvas = document.createElement('canvas');
-        var w = img.width;
-        var h = img.height;
-
-        if (w > h) {
-            if (w > maxSize) { h *= maxSize / w; w = maxSize; }
-        } else {
-            if (h > maxSize) { w *= maxSize / h; h = maxSize; }
-        }
-
-        canvas.width = w;
-        canvas.height = h;
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        callback(canvas.toDataURL("image/jpeg", quality));
-    };
-    img.src = dataUrl;
-}
 
 // =====================================================
 // АУДИО — тест воспроизведения
@@ -1445,7 +1408,7 @@ function loadLevelImage(slot, input) {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function(e) {
-        compressImage(e.target.result, function(cocompressImage(e.target.result, (slot === 'lbg'), function(compressed) {mpressed) {
+        compressImage(e.target.result, (slot === 'lbg'), function(compressed) {
             if (!levelMeta[currentLevel]) levelMeta[currentLevel] = { name: '', assets: {} };
             levelMeta[currentLevel].assets[slot] = {
                 original: e.target.result, compressed: compressed,
@@ -2159,7 +2122,6 @@ function showToast(message) {
     setTimeout(function() { toast.remove(); }, 5000);
 }
 
-}
 </script>
 
 </body>
